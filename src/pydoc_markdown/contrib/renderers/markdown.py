@@ -39,7 +39,7 @@ from pydoc_markdown.interfaces import (
     SinglePageRenderer,
     SourceLinker,
 )
-from pydoc_markdown.util.docspec import ApiSuite, format_function_signature, is_method
+from pydoc_markdown.util.docspec import format_function_signature, is_method, ApiSuite
 
 
 def dotted_name(obj: docspec.ApiObject) -> str:
@@ -248,7 +248,8 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
         if self.render_module_header_template and isinstance(obj, docspec.Module):
             fp.write(
                 self.render_module_header_template.format(
-                    module_name=obj.name, relative_module_name=obj.name.rsplit(".", 1)[-1]
+                    module_name=obj.name,
+                    relative_module_name=obj.name.rsplit(".", 1)[-1],
                 )
             )
             return
@@ -259,11 +260,15 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
             # in the field will act as a first fallback, the level of the object inside it's
             # hierarchy is the final fallback.
             header_levels = {
-                **type(self).__dataclass_fields__["header_level_by_type"].default_factory(),
+                **type(self)
+                .__dataclass_fields__["header_level_by_type"]
+                .default_factory(),
                 **self.header_level_by_type,
             }
             # Backwards compat for when we used "Data" instead of "Variable" which mirrors the docspec API
-            header_levels["Variable"] = header_levels.get("Data", header_levels["Variable"])
+            header_levels["Variable"] = header_levels.get(
+                "Data", header_levels["Variable"]
+            )
 
             type_name = "Method" if self._is_method(obj) else type(obj).__name__
             level = header_levels.get(type_name, level)
@@ -278,7 +283,9 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
         fp.write(header_template.format(title=self._get_title(obj)))
         fp.write("\n\n")
 
-    def _format_decorations(self, decorations: t.List[docspec.Decoration]) -> t.Iterable[str]:
+    def _format_decorations(
+        self, decorations: t.List[docspec.Decoration]
+    ) -> t.Iterable[str]:
         for dec in decorations:
             yield "@{}{}\n".format(dec.name, dec.args or "")
 
@@ -290,7 +297,10 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
         return FormatCode(code, style_config=style)[0]
 
     def _format_function_signature(
-        self, func: docspec.Function, override_name: str = None, add_method_bar: bool = True
+        self,
+        func: docspec.Function,
+        override_name: str = None,
+        add_method_bar: bool = True,
     ) -> str:
         parts: t.List[str] = []
         if self.signature_with_decorators:
@@ -337,7 +347,9 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
         if self.classdef_code_block and isinstance(obj, docspec.Class):
             code = self._format_classdef_signature(obj)
         elif self.signature_code_block and isinstance(obj, docspec.Function):
-            code = self._format_function_signature(obj, add_method_bar=self.signature_with_vertical_bar)
+            code = self._format_function_signature(
+                obj, add_method_bar=self.signature_with_vertical_bar
+            )
         elif self.data_code_block and isinstance(obj, docspec.Variable):
             code = self._format_data_signature(obj)
         else:
@@ -354,7 +366,9 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
 
         if render_view_source:
             url = self.source_linker.get_source_url(obj) if self.source_linker else None
-            source_string = self.source_format.replace("{url}", str(url)) if url else None
+            source_string = (
+                self.source_format.replace("{url}", str(url)) if url else None
+            )
             if source_string and self.source_position == "before signature":
                 fp.write(source_string + "\n\n")
 
@@ -365,7 +379,11 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
                 fp.write(source_string + "\n\n")
 
         if obj.docstring:
-            docstring = html.escape(obj.docstring.content) if self.escape_html_in_docstring else obj.docstring.content
+            docstring = (
+                html.escape(obj.docstring.content)
+                if self.escape_html_in_docstring
+                else obj.docstring.content
+            )
             lines = docstring.split("\n")
             if self.docstrings_as_blockquote:
                 lines = ["> " + x for x in lines]
@@ -392,7 +410,11 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
             if self.signature_in_header:
                 title += "(" + self._format_arglist(obj) + ")"
 
-        if isinstance(obj, docspec.Variable) and obj.datatype and self.render_typehint_in_data_header:
+        if (
+            isinstance(obj, docspec.Variable)
+            and obj.datatype
+            and self.render_typehint_in_data_header
+        ):
             if self.code_headers:
                 title += f": {obj.datatype}"
             elif self.html_headers:
@@ -426,19 +448,39 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
     def _escape(self, s):
         return s.replace("_", "\\_").replace("*", "\\*")
 
-    def render_to_string(self, modules: t.List[docspec.Module]) -> str:
+    def render_to_string(
+        self,
+        modules: t.List[docspec.Module],
+        render_imported_modules: bool = True,
+    ) -> str:
+        print(render_imported_modules)
         fp = io.StringIO()
-        self.render_single_page(fp, modules)
+        self.render_single_page(
+            fp, modules, render_imported_modules=render_imported_modules
+        )
         return fp.getvalue()
 
-    def _render_to_stream(self, modules: t.List[docspec.Module], stream: t.TextIO):
-        return self.render_single_page(stream, modules)
+    def _render_to_stream(
+        self,
+        modules: t.List[docspec.Module],
+        stream: t.TextIO,
+        render_imported_modules: bool = True,
+    ):
+        return self.render_single_page(
+            stream, modules, render_imported_modules=render_imported_modules
+        )
 
     # SinglePageRenderer
 
     def render_single_page(
-        self, fp: t.TextIO, modules: t.List[docspec.Module], page_title: t.Optional[str] = None
+        self,
+        fp: t.TextIO,
+        modules: t.List[docspec.Module],
+        page_title: t.Optional[str] = None,
+        render_imported_modules: bool = True,
     ) -> None:
+        print(render_imported_modules)
+
         if self.render_page_title:
             fp.write("# {}\n\n".format(page_title))
 
@@ -454,11 +496,21 @@ class MarkdownRenderer(Renderer, SinglePageRenderer, SingleObjectRenderer):
                 self._render_toc(fp, 0, m)
             fp.write("\n")
         for m in modules:
+            if not render_imported_modules:
+                print("OKOKOK")
+                m.members = list(
+                    filter(lambda x: not isinstance(x, docspec.Indirection), m.members)
+                )
+            else:
+                print("CIAO")
+            print(m.members)
             self._render_recursive(fp, 1, m)
 
     # SingleObjectRenderer
 
-    def render_object(self, fp: t.TextIO, obj: docspec.ApiObject, options: t.Dict[str, t.Any]) -> None:
+    def render_object(
+        self, fp: t.TextIO, obj: docspec.ApiObject, options: t.Dict[str, t.Any]
+    ) -> None:
         self._render_recursive(fp, 0, obj)
 
     # Renderer
@@ -526,7 +578,9 @@ class MarkdownReferenceResolver(Resolver, ResolverV2):
 
     # ResolverV2
 
-    def resolve_reference(self, suite: ApiSuite, scope: docspec.ApiObject, ref: str) -> t.Optional[docspec.ApiObject]:
+    def resolve_reference(
+        self, suite: ApiSuite, scope: docspec.ApiObject, ref: str
+    ) -> t.Optional[docspec.ApiObject]:
         """Resolves the reference by searching in the members of *scope* or any of its parents."""
 
         # TODO (@NiklasRosenstein): Support resolving indirections
